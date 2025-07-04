@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'ComfyUI/**'
+      - './Dockerfile'
 jobs:
   build-and-push:
     runs-on: ubuntu-latest

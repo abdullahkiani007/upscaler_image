@@ -1,0 +1,193 @@
+{
+  "input": {
+    "uid": "test_input",
+    "workflow": {
+      "90": {
+        "inputs": {
+          "image": "input_image_1.png"
+        },
+        "class_type": "LoadImage",
+        "_meta": {
+          "title": "Image 1"
+        }
+      },
+      "132": {
+        "inputs": {
+          "vae_name": "ae.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": {
+          "title": "Load VAE"
+        }
+      },
+      "140": {
+        "inputs": {
+          "unet_name": "flux1-dev.safetensors",
+          "weight_dtype": "fp8_e4m3fn_fast"
+        },
+        "class_type": "UNETLoader",
+        "_meta": {
+          "title": "Load FLUX original Model"
+        }
+      },
+      "142": {
+        "inputs": {
+          "object_to_patch": "diffusion_model",
+          "residual_diff_threshold": 0.05900000000000001,
+          "start": 0,
+          "end": 1,
+          "max_consecutive_cache_hits": 0,
+          "model": ["140", 0]
+        },
+        "class_type": "ApplyFBCacheOnModel",
+        "_meta": {
+          "title": "Apply First Block Cache"
+        }
+      },
+      "143": {
+        "inputs": {
+          "clip_name1": "t5xxl_fp16.safetensors",
+          "clip_name2": "clip_l.safetensors",
+          "type": "flux",
+          "device": "default"
+        },
+        "class_type": "DualCLIPLoader",
+        "_meta": {
+          "title": "DualCLIPLoader"
+        }
+      },
+      "591": {
+        "inputs": {
+          "conditioning": ["604", 0]
+        },
+        "class_type": "ConditioningZeroOut",
+        "_meta": {
+          "title": "ConditioningZeroOut"
+        }
+      },
+      "593": {
+        "inputs": {
+          "filename_prefix": "FLUX",
+          "images": ["601", 0]
+        },
+        "class_type": "SaveImage",
+        "_meta": {
+          "title": "Save Flux Image"
+        }
+      },
+      "599": {
+        "inputs": {
+          "model_name": "4xNomos8kHAT-L_otf.safetensors"
+        },
+        "class_type": "UpscaleModelLoader",
+        "_meta": {
+          "title": "Load Upscale Model"
+        }
+      },
+      "601": {
+        "inputs": {
+      "upscale_by": 3.0000000000000004,
+          "seed": 1027418200883800,
+          "steps": 10,
+          "cfg": 1,
+          "sampler_name": "gradient_estimation",
+          "scheduler": "beta",
+         "denoise": 0.30000000000000004,
+         "mode_type": "Chess",
+      "tile_width": 1024,
+      "tile_height": 1024,
+      "mask_blur": 20,
+      "tile_padding": 56,
+      "seam_fix_mode": "None",
+      "seam_fix_denoise": 0.25000000000000006,
+      "seam_fix_width": 32,
+      "seam_fix_mask_blur": 40,
+      "seam_fix_padding": 168,
+      "force_uniform_tiles": true,
+      "tiled_decode": true,
+          "image": ["90", 0],
+          "model": ["142", 0],
+          "positive": ["604", 0],
+          "negative": ["591", 0],
+          "vae": ["132", 0],
+          "upscale_model": ["599", 0]
+        },
+        "class_type": "UltimateSDUpscale",
+        "_meta": {
+          "title": "upscale"
+        }
+      },
+      "604": {
+        "inputs": {
+          "clip": ["143", 0],
+          "text": ["787", 0]
+        },
+        "class_type": "Text to Conditioning",
+        "_meta": {
+          "title": "Text to Conditioning"
+        }
+      },
+      "785": {
+        "inputs": {
+          "model": "fancyfeast/llama-joycaption-beta-one-hf-llava",
+          "quantization_mode": "bf16",
+          "device": "cuda"
+        },
+        "class_type": "LayerUtility: LoadJoyCaptionBeta1Model",
+        "_meta": {
+          "title": "LayerUtility: Load JoyCaption Beta One Model (Advance)"
+        }
+      },
+      "786": {
+        "inputs": {
+          "refer_character_name": true,
+          "exclude_people_info": true,
+          "include_lighting": true,
+          "include_camera_angle": true,
+          "include_watermark": false,
+          "include_JPEG_artifacts": false,
+          "include_exif": false,
+          "exclude_sexual": false,
+          "exclude_image_resolution": true,
+          "include_aesthetic_quality": false,
+          "include_composition_style": true,
+          "exclude_text": false,
+          "specify_depth_field": true,
+          "specify_lighting_sources": true,
+          "do_not_use_ambiguous_language": true,
+          "include_nsfw": true,
+          "only_describe_most_important_elements": false,
+          "character_name": "aidmafluxpro1.1"
+        },
+        "class_type": "LayerUtility: JoyCaption2ExtraOptions",
+        "_meta": {
+          "title": "LayerUtility: JoyCaption2 Extra Options(Advance)"
+        }
+      },
+      "787": {
+        "inputs": {
+          "caption_type": "Descriptive",
+          "caption_length": "any",
+          "max_new_tokens": 1024,
+          "top_p": 0.9,
+          "top_k": 0,
+          "temperature": 0.25000000000000006,
+          "user_prompt": "Describe the image with extreme detail, focusing on fashion and physical features. Start by describing the model’s physical appearance: estimated age, height, body shape, skin tone and texture, face shape, eye color and direction, hair length, color, style, and texture, makeup, and facial expression.\nThen describe the outfit in depth: clothing type, cut, fit, colors, materials, surface textures, seams, collars, buttons or zippers, any visible logos or brand elements, accessories, and how the clothes interact with the body.\nClose with a description of the model's pose, the lighting type, background color or context (e.g., studio, natural), and the overall visual or editorial style.\nBe highly descriptive, professional, and write in fluent, photographic English suitable for fashion editorial or e-commerce photography.\n\n\n",
+          "image": ["90", 0],
+          "joycaption_beta1_model": ["785", 0],
+          "extra_options": ["786", 0]
+        },
+        "class_type": "LayerUtility: JoyCaptionBeta1",
+        "_meta": {
+          "title": "LayerUtility: JoyCaption Beta One (Advance)"
+        }
+      }
+    },
+    "images": [
+      {
+        "name": "example.png",
+        "image": "base64"
+      }
+    ]
+  }
+}

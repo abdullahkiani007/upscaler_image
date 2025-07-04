@@ -4,14 +4,12 @@ on:
   push:
     branches:
       - main
-
-    workflow_dispatch:  # Allows manual runs
+ 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-      
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -27,8 +25,9 @@ jobs:
       - name: Build and push Docker image (Lite)
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./ComfyUI
+          file: ./ComfyUI/Dockerfile.lite
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/comfyui-custom:latest
-          
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/comfyui-lite:latest
+          build-args: |
+            HUGGINGFACE_ACCESS_TOKEN=${{ secrets.HUGGINGFACE_ACCESS_TOKEN }}

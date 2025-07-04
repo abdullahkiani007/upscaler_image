@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - './Dockerfile'
+    workflow_dispatch:  # Allows manual runs
 jobs:
   build-and-push:
     runs-on: ubuntu-latest

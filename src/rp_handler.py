@@ -1,5 +1,6 @@
 import runpod
 from runpod.serverless.utils import rp_upload
+from comfy_runner.inf import ComfyRunner
 import json
 import urllib.request
 import urllib.parse
@@ -8,19 +9,18 @@ import os
 import requests
 import base64
 from io import BytesIO
+import zipfile
 
 # Time to wait between API check attempts in milliseconds
 COMFY_API_AVAILABLE_INTERVAL_MS = 50
 # Maximum number of API check attempts
 COMFY_API_AVAILABLE_MAX_RETRIES = 500
 # Time to wait between poll attempts in milliseconds
-COMFY_POLLING_INTERVAL_MS = int(
-    os.environ.get("COMFY_POLLING_INTERVAL_MS", 250))
+COMFY_POLLING_INTERVAL_MS = int(os.environ.get("COMFY_POLLING_INTERVAL_MS", 250))
 # Maximum number of poll attempts
-COMFY_POLLING_MAX_RETRIES = int(
-    os.environ.get("COMFY_POLLING_MAX_RETRIES", 500))
+COMFY_POLLING_MAX_RETRIES = int(os.environ.get("COMFY_POLLING_MAX_RETRIES", 500))
 # Host where ComfyUI is running
-COMFY_HOST = "127.0.0.1:8188"
+COMFY_HOST = "127.0.0.1:4333"
 # Enforce a clean state after each job is done
 # see https://docs.runpod.io/docs/handler-additional-controls#refresh-worker
 REFRESH_WORKER = os.environ.get("REFRESH_WORKER", "false").lower() == "true"
@@ -52,20 +52,12 @@ def validate_input(job_input):
     workflow = job_input.get("workflow")
     if workflow is None:
         return None, "Missing 'workflow' parameter"
-
-    # Validate 'images' in input, if provided
-    images = job_input.get("images")
-    if images is not None:
-        if not isinstance(images, list) or not all(
-            "name" in image and "image" in image for image in images
-        ):
-            return (
-                None,
-                "'images' must be a list of objects with 'name' and 'image' keys",
-            )
     uid = job_input.get("uid")
+    customModels = job_input.get("customModels")    #customModels will be an array containing dicts of the following format {filename:,url:,dest:}
+    customNodes = job_input.get("customNodes")
+    images = job_input.get("images")
     # Return validated data and no error
-    return {"uid": uid, "workflow": workflow, "images": images}, None
+    return {"uid": uid ,"workflow": workflow, "images": images,"customModels":customModels,"customNodes":customNodes}, None
 
 
 def check_server(url, retries=500, delay=50):
@@ -133,8 +125,7 @@ def upload_images(images):
         }
 
         # POST request to upload the image
-        response = requests.post(
-            f"http://{COMFY_HOST}/upload/image", files=files)
+        response = requests.post(f"http://{COMFY_HOST}/upload/image", files=files)
         if response.status_code != 200:
             upload_errors.append(f"Error uploading {name}: {response.text}")
         else:
@@ -156,22 +147,56 @@ def upload_images(images):
     }
 
 
-def queue_workflow(workflow):
+def queue_workflow(workflow,customModels,customNodes,images):
     """
-    Queue a workflow to be processed by ComfyUI
+    Queue a workflow to be processed by ComfyUI and load any custom models(if any)
 
     Args:
         workflow (dict): A dictionary containing the workflow to be processed
+        customModels (array): An array containing the dicts of the models filename, url and dest
+        customNodes (array): An array containing the dicts of the node names and urls
+        images : A s3 url of the zip folder of the images [optional]
 
     Returns:
         dict: The JSON response from ComfyUI after processing the workflow
     """
 
-    # The top level element "prompt" is required by ComfyUI
-    data = json.dumps({"prompt": workflow}).encode("utf-8")
+    filePathList = []
+    if images is not None:
+        s3_url = images
+        # Download the ZIP file from S3
+        with urllib.request.urlopen(s3_url) as response:
+            with open("images.zip", "wb") as f:
+                f.write(response.read())
 
-    req = urllib.request.Request(f"http://{COMFY_HOST}/prompt", data=data)
-    return json.loads(urllib.request.urlopen(req).read())
+        # Set your desired extraction folder
+        extraction_folder = "./images"
+        os.makedirs(extraction_folder, exist_ok=True)
+
+        # Extract the ZIP file into the desired folder
+        with zipfile.ZipFile("images.zip", "r") as zip_ref:
+            zip_ref.extractall(extraction_folder)
+        os.remove("images.zip")
+
+        # Build a list of file paths for the extracted images
+        filePathList = [os.path.join(extraction_folder, filename)
+                        for filename in os.listdir(extraction_folder)
+                        if os.path.isfile(os.path.join(extraction_folder, filename))]
+
+        print("the files path list in the rp_handler",filePathList)
+    # Store the workflow in a file
+    with open("workflow.json", "w") as f:
+        json.dump(workflow, f)
+    runner = ComfyRunner()
+    output = runner.predict(
+        workflow_input="workflow.json",
+        extra_models_list = customModels,
+        extra_node_urls = customNodes,
+        file_path_list=filePathList,
+        stop_server_after_completion=True,
+    )
+
+    return output
 
 
 def get_history(prompt_id):
@@ -203,78 +228,63 @@ def base64_encode(img_path):
         return f"{encoded_string}"
 
 
-def process_output_images(outputs, job_id):
+def process_output_images(queued_workflow, job_id):
     """
-    This function takes the "outputs" from image generation and the job ID,
-    then determines the correct way to return the image, either as a direct URL
-    to an AWS S3 bucket or as a base64 encoded string, depending on the
-    environment configuration.
+    Processes multiple output images from the workflow result.
 
     Args:
-        outputs (dict): A dictionary containing the outputs from image generation,
-                        typically includes node IDs and their respective output data.
-        job_id (str): The unique identifier for the job.
+        queued_workflow (dict): The output from queue_workflow containing file paths
+        job_id (str): The unique identifier for the job
 
     Returns:
-        dict: A dictionary with the status ('success' or 'error') and the message,
-              which is either the URL to the image in the AWS S3 bucket or a base64
-              encoded string of the image. In case of error, the message details the issue.
-
-    The function works as follows:
-    - It first determines the output path for the images from an environment variable,
-      defaulting to "/comfyui/output" if not set.
-    - It then iterates through the outputs to find the filenames of the generated images.
-    - After confirming the existence of the image in the output folder, it checks if the
-      AWS S3 bucket is configured via the BUCKET_ENDPOINT_URL environment variable.
-    - If AWS S3 is configured, it uploads the image to the bucket and returns the URL.
-    - If AWS S3 is not configured, it encodes the image in base64 and returns the string.
-    - If the image file does not exist in the output folder, it returns an error status
-      with a message indicating the missing image file.
+        dict: A dictionary containing status and list of processed images with their data and file types
     """
+    COMFY_OUTPUT_PATH = os.environ.get("COMFY_OUTPUT_PATH", "/output")
+    processed_images = []
 
-    # The path where ComfyUI stores the generated images
-    COMFY_OUTPUT_PATH = os.environ.get("COMFY_OUTPUT_PATH", "/comfyui/output")
+    # Extract file paths from the workflow output
+    file_paths = queued_workflow.get('file_paths', [])
 
-    output_images = {}
+    for file_path in file_paths:
+        full_path = os.path.join(COMFY_OUTPUT_PATH, file_path)
 
-    for node_id, node_output in outputs.items():
-        if "images" in node_output:
-            for image in node_output["images"]:
-                output_images = os.path.join(
-                    image["subfolder"], image["filename"])
+        if os.path.exists(full_path):
+            # Determine file type from extension
+            file_type = os.path.splitext(file_path)[1].lower().replace('.', '')
 
-    print(f"runpod-worker-comfy - image generation is done")
+            if os.environ.get("BUCKET_ENDPOINT_URL", False) and os.environ.get("BUCKET_ACCESS_KEY_ID", False) and os.environ.get("BUCKET_SECRET_ACCESS_KEY", False) :
+                # Upload to S3 and get URL
+                try:
+                    image_data = rp_upload.upload_image(job_id, full_path)
+                    image_format = "url"
+                except Exception as e:
+                    print(f"Error uploading image to S3: {str(e)}")
+                    image_data = base64_encode(full_path)
+                    image_format = "base64"
+            else:
+                # Convert to base64
+                print("S3 Environment Variables are not set, sending image as base64")
+                image_data = base64_encode(full_path)
+                image_format = "base64"
 
-    # expected image output folder
-    local_image_path = f"{COMFY_OUTPUT_PATH}/{output_images}"
-
-    print(f"runpod-worker-comfy - {local_image_path}")
-
-    # The image is in the output folder
-    if os.path.exists(local_image_path):
-        if os.environ.get("BUCKET_ENDPOINT_URL", False):
-            # URL to image in AWS S3
-            image = rp_upload.upload_image(job_id, local_image_path)
-            print(
-                "runpod-worker-comfy - the image was generated and uploaded to AWS S3"
-            )
+            processed_images.append({
+                "data": image_data,
+                "file_type": file_type,
+                "format": image_format
+            })
         else:
-            # base64 image
-            image = base64_encode(local_image_path)
-            print(
-                "runpod-worker-comfy - the image was generated and converted to base64"
-            )
+            print(f"runpod-worker-comfy - image not found: {full_path}")
 
-        return {
-            "status": "success",
-            "message": image,
-        }
-    else:
-        print("runpod-worker-comfy - the image does not exist in the output folder")
+    if not processed_images:
         return {
             "status": "error",
-            "message": f"the image does not exist in the specified output folder: {local_image_path}",
+            "message": "No images were successfully processed"
         }
+
+    return {
+        "status": "success",
+        "images": processed_images
+    }
 
 
 def handler(job):
@@ -290,79 +300,24 @@ def handler(job):
     Returns:
         dict: A dictionary containing either an error message or a success status with generated images.
     """
-    print(f"runpod-worker-comfy - received job: {job}")
-    print("Executing runpod-worker-comfy handler")
-
     job_input = job["input"]
-    print(f"runpod-worker-comfy - job input: {job_input}")
-
     # Make sure that the input is valid
     validated_data, error_message = validate_input(job_input)
     if error_message:
-        print(
-            f"runpod-worker-comfy - input validation failed: {error_message}")
         return {"error": error_message}
 
     # Extract validated data
     workflow = validated_data["workflow"]
-    print(f"runpod-worker-comfy - workflow: {workflow}")
+
     images = validated_data.get("images")
-    print(f"runpod-worker-comfy - images: {images}")
-    UID = validated_data.get("uid")
-    BUCKET_NAME = os.getenv('BUCKET_NAME')
-    OBJECT_KEY = os.getenv('OBJECT_KEY')
-    MODEL_URL = f"https://{BUCKET_NAME}.s3.amazonaws.com/{UID}/{OBJECT_KEY}"
-    # Download models
-    print(f"runpod-worker-comfy - downloading models")
-    os.system("chmod +x download_model.sh")
-    os.system(f"./download_model.sh {MODEL_URL}")
-
-    # Make sure that the ComfyUI API is available
-    check_server(
-        f"http://{COMFY_HOST}",
-        COMFY_API_AVAILABLE_MAX_RETRIES,
-        COMFY_API_AVAILABLE_INTERVAL_MS,
-    )
-
-    # Upload images if they exist
-    upload_result = upload_images(images)
-
-    if upload_result["status"] == "error":
-        return upload_result
-
-    # Queue the workflow
+    customModels = validated_data["customModels"]
+    customNodes =  validated_data["customNodes"]
     try:
-        print(f"runpod-worker-comfy - queueing workflow")
-        queued_workflow = queue_workflow(workflow)
-        prompt_id = queued_workflow["prompt_id"]
-        print(f"runpod-worker-comfy - queued workflow with ID {prompt_id}")
+        queued_workflow = queue_workflow(workflow,customModels,customNodes,images)
+        result = process_output_images(queued_workflow, job["id"])
+        result["refresh_worker"] = REFRESH_WORKER
     except Exception as e:
         return {"error": f"Error queuing workflow: {str(e)}"}
-
-    # Poll for completion
-    print(f"runpod-worker-comfy - wait until image generation is complete")
-    retries = 0
-    try:
-        while True:
-            history = get_history(prompt_id)
-
-            # Exit the loop if we have found the history
-            if prompt_id in history and history[prompt_id].get("outputs"):
-                break
-            else:
-                # Wait before trying again
-                time.sleep(COMFY_POLLING_INTERVAL_MS / 1000)
-                retries += 1
-        else:
-            return {"error": "Max retries reached while waiting for image generation"}
-    except Exception as e:
-        return {"error": f"Error waiting for image generation: {str(e)}"}
-
-    # Get the generated image and return it as URL in an AWS bucket or as base64
-    images_result = process_output_images(
-        history[prompt_id].get("outputs"), job["id"])
-
-    result = {**images_result, "refresh_worker": REFRESH_WORKER}
 
     return result
 

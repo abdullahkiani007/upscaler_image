@@ -1,5 +1,5 @@
 comfyui:
-    base_path: /runpod-volume/comfyui
+    base_path: /runpod-volume/ComfyUI
     checkpoints: models/checkpoints/
     clip: models/clip/
     clip_vision: models/clip_vision/
@@ -22,7 +22,7 @@ comfyui:
     custom_nodes: custom_nodes/
 
 other_ui:
-    base_path: /runpod-volume/comfyui
+    base_path: /runpod-volume/ComfyUI
     checkpoints: models/checkpoints/
     clip: models/clip/
     clip_vision: models/clip_vision/

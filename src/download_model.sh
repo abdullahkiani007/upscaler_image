@@ -1,6 +1,6 @@
-MODEL_DIR=/runpod-volume/comfyui/models/
+MODEL_DIR=/runpod-volume/ComfyUI/models/
 mkdir -p $MODEL_DIR
-chmod -R 777 /runpod-volume/comfyui/models
+chmod -R 777 /runpod-volume/ComfyUI/models
 # https://huggingface.co/realung/flux1-dev.safetensors/resolve/main/flux1-dev.safetensors
 if [ ! -f "$MODEL_DIR/unet/flux/flux1-dev.safetensors" ]; then
     wget -c $1 -P "$MODEL_DIR/unet/flux/"
@@ -27,4 +27,4 @@ if [ ! -f "$MODEL_DIR/vae/FLUX1/ae.safetensors" ]; then
 fi
 
 echo "runpod-worker-comfy: Starting ComfyUI"
-python3 ./comfyui/main.py --disable-auto-launch --disable-metadata --listen &
+python3 ./ComfyUI/main.py --disable-auto-launch --disable-metadata --listen &

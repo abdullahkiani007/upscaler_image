@@ -28,11 +28,11 @@ RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 RUN pip install comfy-cli
 
 # Install ComfyUI
-RUN /usr/bin/yes | comfy --workspace /comfyui install --cuda-version 11.8 --nvidia
+RUN /usr/bin/yes | comfy --workspace /ComfyUI install --cuda-version 11.8 --nvidia
 
 RUN comfy update all
 
-WORKDIR /comfyui
+WORKDIR /ComfyUI
 
 # Install requirements
 RUN pip install runpod requests opencv-python-headless

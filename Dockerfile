@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Prefer binary wheels over source distributions for faster pip installations
 ENV PIP_PREFER_BINARY=1
 # Ensures output from python is printed immediately to the terminal without buffering
-ENV PYTHONUNBUFFERED=1 
+ENV PYTHONUNBUFFERED=1
 # Speed up some cmake builds
 ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 
@@ -50,7 +50,9 @@ WORKDIR /
 # RUN comfy node install --mode remote https://github.com/ltdrdata/ComfyUI-Inspire-Pack
 # RUN comfy node install --mode remote https://github.com/pamparamm/ComfyUI-ppm
 RUN comfy node install --mode remote https://github.com/ltdrdata/ComfyUI-Manager.git
-
+RUN echo "current directory is " && pwd && echo "directories" && ls && cd /ComfyUI/custom_nodes
+RUN echo "clonning wav speed " && ls && git clone https://github.com/chengzeyi/Comfy-WaveSpeed.git
+RUN cd /ComfyUI
 # Add scripts
 ADD src/start.sh src/download_model.sh src/restore_snapshot.sh src/rp_handler.py src/snapshot.json test_input.json ./
 RUN chmod +x /start.sh /restore_snapshot.sh

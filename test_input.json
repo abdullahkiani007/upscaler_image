@@ -1,6 +1,7 @@
 {
   "input": {
     "uid": "test_input",
+    "images":"https://aifrank.s3.us-east-1.amazonaws.com/images.zip",
     "workflow": {
       "90": {
         "inputs": {
@@ -182,12 +183,6 @@
           "title": "LayerUtility: JoyCaption Beta One (Advance)"
         }
       }
-    },
-    "images": [
-      {
-        "name": "example.png",
-        "image": "base64"
-      }
-    ]
+    }
   }
 }

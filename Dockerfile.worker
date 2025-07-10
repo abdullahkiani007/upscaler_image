@@ -1,4 +1,4 @@
-FROM runpod/worker-comfyui:5.2.0-flux1-dev
+FROM runpod/worker-comfyui:5.2.0-base
 
 RUN comfy-node-install was-ns ComfyUI_LayerStyle_Advance comfyui_ultimatesdupscale wavespeed
 

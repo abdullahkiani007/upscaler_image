@@ -26,5 +26,5 @@ if [ ! -f "$MODEL_DIR/vae/FLUX1/ae.safetensors" ]; then
     wget -c https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors -P "$MODEL_DIR/vae/FLUX1/"
 fi
 
-echo "runpod-worker-comfy: Starting ComfyUI"
-python3 ./ComfyUI/main.py --disable-auto-launch --disable-metadata --listen &
+# echo "runpod-worker-comfy: Starting ComfyUI"
+# python3 ./ComfyUI/main.py --disable-auto-launch --disable-metadata --listen &

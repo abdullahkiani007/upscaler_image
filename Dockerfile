@@ -32,6 +32,8 @@ RUN /usr/bin/yes | comfy --workspace /ComfyUI install --cuda-version 11.8 --nvid
 
 RUN comfy update all
 
+EXPOSE 8188
+
 WORKDIR /ComfyUI
 
 # Install requirements

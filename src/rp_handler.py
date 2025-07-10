@@ -240,12 +240,11 @@ def handler(job):
     image_zip_url = validated_data.get("image_zip_url")
     BUCKET_NAME = os.getenv('BUCKET_NAME')
     OBJECT_KEY = os.getenv('OBJECT_KEY')
-    MODEL_URL = f"https://{BUCKET_NAME}.s3.amazonaws.com/{UID}/{OBJECT_KEY}"
 
     # Download models
     print(f"runpod-worker-comfy - downloading models")
     os.system("chmod +x download_model.sh")
-    os.system(f"./download_model.sh {MODEL_URL}")
+    os.system(f"./download_model.sh")
 
     # Download and extract images from ZIP if URL is provided
     downloaded_images = download_and_extract_images(image_zip_url) if image_zip_url else []
@@ -262,6 +261,7 @@ def handler(job):
     check_server(f"http://{COMFY_HOST}", COMFY_API_AVAILABLE_MAX_RETRIES, COMFY_API_AVAILABLE_INTERVAL_MS)
 
     # Upload images
+    print("images", images)
     upload_result = upload_images(images)
     if upload_result["status"] == "error":
         return upload_result

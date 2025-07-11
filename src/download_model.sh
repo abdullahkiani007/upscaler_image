@@ -1,9 +1,9 @@
-MODEL_DIR=/runpod-volume/ComfyUI/models/
+MODEL_DIR=/runpod-volume/models/
 mkdir -p $MODEL_DIR
-chmod -R 777 /runpod-volume/ComfyUI/models
+chmod -R 777 /runpod-volume/models
 # https://huggingface.co/realung/flux1-dev.safetensors/resolve/main/flux1-dev.safetensors
-if [ ! -f "$MODEL_DIR/unet/flux/flux1-dev.safetensors" ]; then
-    wget -c $1 -P "$MODEL_DIR/unet/flux/"
+if [ ! -f "$MODEL_DIR/unet/flux1-dev.safetensors" ]; then
+    wget -c $1 -P "$MODEL_DIR/unet/"
 fi
 
 # if [ ! -f "$MODEL_DIR/loras/flux_tools/42lux-UltimateAtHome-flux-highresfix.safetensors" ]; then
@@ -22,8 +22,8 @@ if [ ! -f "$MODEL_DIR/clip/clip_l.safetensors" ]; then
     wget -c https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors -P "$MODEL_DIR/clip/"
 fi
 
-if [ ! -f "$MODEL_DIR/vae/FLUX1/ae.safetensors" ]; then
-    wget -c https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors -P "$MODEL_DIR/vae/FLUX1/"
+if [ ! -f "$MODEL_DIR/vae/ae.safetensors" ]; then
+    wget -c https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors -P "$MODEL_DIR/vae/"
 fi
 
 # echo "runpod-worker-comfy: Starting ComfyUI"
